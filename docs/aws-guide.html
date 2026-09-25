@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="AWS deployment guide for Harvest and Home E-commerce Spring Boot.">
+  <title>AWS guide | Harvest &amp; Home</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="./"><span class="brand-mark">+</span><span>Harvest &amp; Home</span></a>
+    <nav class="nav" aria-label="Primary navigation"><a href="./">Project home</a><a href="https://github.com/phanpavang143/WebDemo/blob/master/infrastructure/README.md" target="_blank" rel="noreferrer">Full README</a></nav>
+  </header>
+  <main class="section-wrap guide-page">
+    <p class="eyebrow">AWS deployment / project WebDemo</p>
+    <h1>From local build to private ECS tasks.</h1>
+    <p class="lede">This page summarizes the deployment path. The repository README remains the source of truth for every Terraform variable and operational detail.</p>
+    <div class="guide-grid">
+      <article class="guide-step"><span>01</span><h2>Authenticate</h2><p>Use IAM Identity Center or SSO. Never commit access keys.</p><pre>aws sso login --profile my-aws
+$env:AWS_PROFILE = "my-aws"
+aws sts get-caller-identity</pre></article>
+      <article class="guide-step"><span>02</span><h2>Prepare secrets</h2><p>Create an AWS Secrets Manager JSON secret with <code>db_driver</code>, <code>db_url</code>, <code>db_username</code>, and <code>db_password</code>. Terraform passes these to ECS without putting them in the image.</p></article>
+      <article class="guide-step"><span>03</span><h2>Provision</h2><p>Terraform creates the VPC, private ECS service, ALB, ECR, S3, SQS, CloudWatch, Lambda, EventBridge, and CloudTrail resources.</p><pre>cd infrastructure/terraform
+terraform init
+terraform validate
+terraform apply -var-file=variables.tfvars</pre></article>
+      <article class="guide-step"><span>04</span><h2>Ship the image</h2><p>Build the Java 25 image, push it to ECR, then update the ECS task definition with its immutable tag.</p><pre>docker build -t jt-spring-commerce:latest .
+docker push &lt;account&gt;.dkr.ecr.&lt;region&gt;.amazonaws.com/&lt;repo&gt;:latest</pre></article>
+      <article class="guide-step"><span>05</span><h2>Verify</h2><p>The ALB health check is public and expects HTTP 200 from <code>/actuator/health</code>. Check CloudWatch logs when a task is unhealthy.</p><pre>terraform output -raw load_balancer_url
+curl &lt;load-balancer-url&gt;/actuator/health</pre></article>
+      <article class="guide-step"><span>06</span><h2>Operate</h2><p>Product images stay private in S3, order events go to SQS, metrics go to CloudWatch, and ECS uses IAM roles instead of static keys.</p></article>
+    </div>
+    <section class="guide-note"><strong>Important:</strong> Terraform does not create MySQL/RDS. Supply a reachable MySQL endpoint through the Secrets Manager secret before deploying the application image.</section>
+    <a class="text-link" href="./">Back to project home <span aria-hidden="true">-&gt;</span></a>
+  </main>
+  <footer class="site-footer section-wrap"><span>Harvest &amp; Home / AWS guide</span><span>WebDemo</span></footer>
+</body>
+</html>
