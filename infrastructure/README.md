@@ -1,4 +1,3 @@
-autoscaling, a scheduled Lambda heartbeat, CloudWatch logs/metrics/alarm and
 # Triển khai E-commerce Spring Boot lên AWS
 
 Tài liệu này hướng dẫn triển khai đúng theo Terraform và mã nguồn hiện tại của
@@ -10,13 +9,13 @@ Terraform trong thư mục `infrastructure/terraform` tạo luồng sau:
 
 ```text
 Internet
-	 |
+   |
 Public Application Load Balancer
-	 |
+   |
 Private ECS Fargate tasks (Spring Boot, port 8080)
-	 |                         |
-	 |                         +--> CloudWatch Logs
-	 +--> NAT Gateway --> AWS APIs
+   |                         |
+   |                         +--> CloudWatch Logs
+   +--> NAT Gateway --> AWS APIs
 
 S3: ảnh sản phẩm riêng tư
 SQS: sự kiện order
@@ -99,6 +98,7 @@ aws_region      = "ap-southeast-1"
 project_name    = "jt-spring-commerce"
 vpc_cidr        = "10.20.0.0/16"
 container_image = ""
+database_secret_arn = ""
 ```
 
 Có thể tạo file riêng để không sửa file mẫu:
@@ -136,23 +136,46 @@ ECS không thể kết nối database trên `localhost` của máy phát triển
 đưa Spring Boot lên ECS, cần chọn một trong hai cách:
 
 1. Tạo Amazon RDS for MySQL trong private subnet và cho phép ECS security
-	 group truy cập cổng `3306`.
+   group truy cập cổng `3306`.
 2. Dùng MySQL/MariaDB đang chạy ở một hệ thống bên ngoài AWS, có endpoint mà
-	 private ECS task truy cập được.
+   private ECS task truy cập được.
 
-Database cần có schema/dữ liệu từ `basedata.sql`. Khi chạy production, truyền
-các biến kết nối vào ECS task:
+Database cần có schema/dữ liệu từ `basedata.sql`. Với production, lưu thông tin
+kết nối trong AWS Secrets Manager dưới dạng JSON. Secret phải có đúng bốn key:
 
 ```text
-DB_DRIVER=com.mysql.cj.jdbc.Driver
-DB_URL=jdbc:mysql://<rds-endpoint>:3306/ecommjava
-DB_USERNAME=<database-user>
-DB_PASSWORD=<database-password>
+{
+  "db_driver": "com.mysql.cj.jdbc.Driver",
+  "db_url": "jdbc:mysql://<rds-endpoint>:3306/ecommjava",
+  "db_username": "<database-user>",
+  "db_password": "<database-password>"
+}
 ```
 
-Trong Spring Boot, tên biến môi trường dạng `DB_URL` được ánh xạ thành
-`db.url`. Không ghi mật khẩu database vào `variables.tfvars`; nên dùng AWS
-Secrets Manager hoặc ECS Secrets cho production.
+Tạo secret bằng AWS CLI, thay các giá trị mẫu bằng thông tin thật:
+
+```powershell
+$secret = '{"db_driver":"com.mysql.cj.jdbc.Driver","db_url":"jdbc:mysql://<rds-endpoint>:3306/ecommjava","db_username":"<database-user>","db_password":"<database-password>"}'
+aws secretsmanager create-secret `
+  --name jt-spring-commerce/database `
+  --secret-string $secret `
+  --region ap-southeast-1
+$DB_SECRET_ARN = aws secretsmanager describe-secret `
+  --secret-id jt-spring-commerce/database `
+  --query ARN --output text `
+  --region ap-southeast-1
+```
+
+Đặt ARN trả về vào `variables.tfvars`:
+
+```hcl
+database_secret_arn = "<secret-arn>"
+```
+
+Khi `container_image` còn rỗng, secret là tùy chọn để tạo hạ tầng nginx ban
+đầu. Khi deploy image Spring Boot, Terraform bắt buộc
+`database_secret_arn` khác rỗng. ECS execution role chỉ được cấp quyền đọc
+đúng secret ARN này.
 
 ## 6. Cho phép ALB health check
 
@@ -162,16 +185,9 @@ Terraform cấu hình ALB kiểm tra:
 /actuator/health
 ```
 
-Route này phải trả HTTP 200 mà không cần đăng nhập. Security configuration hiện
-đang bảo vệ các route còn lại bằng role `USER`, vì vậy cần cho phép health
-endpoint trước khi deploy thật:
-
-```java
-.requestMatchers("/actuator/health").permitAll()
-```
-
-Sau khi sửa, chạy test và build lại image. Nếu endpoint trả 302 về `/login`,
-ALB sẽ đánh dấu ECS task là unhealthy.
+Route này đã được mở public trong `SecurityConfiguration` và phải trả HTTP 200
+mà không cần đăng nhập. Nếu endpoint trả 302 về `/login`, ALB sẽ đánh dấu ECS
+task là unhealthy.
 
 ## 7. Tạo hạ tầng cơ sở lần đầu
 
@@ -211,7 +227,7 @@ $ECR = terraform output -raw ecr_repository_url
 $REGION = "ap-southeast-1"
 
 aws ecr get-login-password --region $REGION |
-	docker login --username AWS --password-stdin $ECR
+  docker login --username AWS --password-stdin $ECR
 ```
 
 Gắn tag và push image:
@@ -227,8 +243,8 @@ Chạy Terraform với image vừa push:
 
 ```powershell
 terraform apply `
-	-var-file=variables.tfvars `
-	-var="container_image=$ECR:latest"
+  -var-file=variables.tfvars `
+  -var="container_image=$ECR:latest"
 ```
 
 Terraform sẽ tạo task definition mới và ECS service sẽ thay thế task nginx
@@ -253,6 +269,7 @@ Terraform đã truyền tự động các biến sau vào ECS:
 ```text
 AWS_ENABLED=true
 AWS_REGION=ap-southeast-1
+AWS_METRICS_NAMESPACE=jt-spring-commerce
 AWS_S3_PRODUCT_BUCKET=<product_images_bucket output>
 AWS_SQS_ORDER_QUEUE_URL=<order_events_queue_url output>
 ```
@@ -276,17 +293,17 @@ Kiểm tra ECS service:
 ```powershell
 aws ecs list-clusters --region ap-southeast-1
 aws ecs list-services `
-	--cluster jt-spring-commerce `
-	--region ap-southeast-1
+  --cluster jt-spring-commerce `
+  --region ap-southeast-1
 ```
 
 Kiểm tra task đang chạy:
 
 ```powershell
 aws ecs list-tasks `
-	--cluster jt-spring-commerce `
-	--service-name jt-spring-commerce `
-	--region ap-southeast-1
+  --cluster jt-spring-commerce `
+  --service-name jt-spring-commerce `
+  --region ap-southeast-1
 ```
 
 Kiểm tra log bằng AWS Console tại:
@@ -321,8 +338,8 @@ docker tag jt-spring-commerce:latest "$ECR:latest"
 docker push "$ECR:latest"
 
 terraform apply `
-	-var-file=variables.tfvars `
-	-var="container_image=$ECR:latest"
+  -var-file=variables.tfvars `
+  -var="container_image=$ECR:latest"
 ```
 
 Nên dùng tag bất biến như `:2026-09-25-01` thay cho `:latest` trong production
@@ -343,7 +360,7 @@ CloudTrail retention policy có thể cần dọn riêng.
 ## 14. Lỗi thường gặp
 
 | Triệu chứng | Nguyên nhân và cách xử lý |
-|---|---|
+| --- | --- |
 | `Unable to locate credentials` | Chạy lại `aws sso login`, kiểm tra `$env:AWS_PROFILE` và `aws sts get-caller-identity`. |
 | ECS task dừng ngay sau khi chạy | Kiểm tra CloudWatch Logs; thường do thiếu database hoặc sai biến `DB_URL`. |
 | ALB báo unhealthy | Kiểm tra `/actuator/health` có trả 200 không và security rule có `permitAll()` không. |

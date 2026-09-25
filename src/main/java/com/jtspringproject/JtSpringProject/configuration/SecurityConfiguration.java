@@ -64,7 +64,8 @@ public class SecurityConfiguration {
 		SecurityFilterChain userFilterChain(HttpSecurity http) throws Exception {
 			http.authorizeHttpRequests(requests -> requests
 					.dispatcherTypeMatchers(DispatcherType.FORWARD, DispatcherType.ERROR).permitAll()
-					.requestMatchers("/login", "/register", "/newuserregister", "/resources/**", "/403").permitAll()
+					.requestMatchers("/login", "/register", "/newuserregister", "/resources/**", "/403",
+							"/actuator/health", "/actuator/info").permitAll()
 					.requestMatchers("/**").hasRole("USER"))
 					.formLogin(login -> login
 							.loginPage("/login")

@@ -15,6 +15,8 @@ import software.amazon.awssdk.services.cloudwatch.model.StandardUnit;
 @Service
 @ConditionalOnProperty(name = "aws.enabled", havingValue = "true")
 public class CloudWatchApplicationMetrics implements ApplicationMetrics {
+	private static final String METRIC_NAMESPACE = System.getenv().getOrDefault("AWS_METRICS_NAMESPACE",
+			"jt-spring-commerce");
 	private final CloudWatchClient cloudWatchClient;
 
 	public CloudWatchApplicationMetrics(CloudWatchClient cloudWatchClient) {
@@ -25,8 +27,8 @@ public class CloudWatchApplicationMetrics implements ApplicationMetrics {
 	public void increment(String metricName) {
 		MetricDatum datum = MetricDatum.builder().metricName(metricName).unit(StandardUnit.COUNT).value(1D)
 				.timestamp(Instant.now()).dimensions(Collections.singletonList(Dimension.builder().name("Application")
-					.value("JtSpringProject").build())).build();
-		cloudWatchClient.putMetricData(PutMetricDataRequest.builder().namespace("JtSpringProject")
+					.value(METRIC_NAMESPACE).build())).build();
+		cloudWatchClient.putMetricData(PutMetricDataRequest.builder().namespace(METRIC_NAMESPACE)
 				.metricData(datum).build());
 	}
 }

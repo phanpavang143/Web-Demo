@@ -34,6 +34,12 @@ variable "container_image" {
   default     = ""
 }
 
+variable "database_secret_arn" {
+  type        = string
+  description = "ARN of a Secrets Manager JSON secret containing db_driver, db_url, db_username and db_password."
+  default     = ""
+}
+
 provider "aws" {
   region = var.aws_region
 }
@@ -271,8 +277,28 @@ resource "aws_iam_role_policy" "ecs_task" {
         Effect   = "Allow"
         Action   = ["sqs:SendMessage", "sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"]
         Resource = aws_sqs_queue.order_events.arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["cloudwatch:PutMetricData"]
+        Resource = "*"
       }
     ]
+  })
+}
+
+resource "aws_iam_role_policy" "ecs_execution_secrets" {
+  count = var.database_secret_arn == "" ? 0 : 1
+
+  name = "${local.name}-database-secret"
+  role = aws_iam_role.ecs_execution.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["secretsmanager:GetSecretValue"]
+      Resource = var.database_secret_arn
+    }]
   })
 }
 
@@ -285,6 +311,13 @@ resource "aws_ecs_task_definition" "application" {
   execution_role_arn       = aws_iam_role.ecs_execution.arn
   task_role_arn            = aws_iam_role.ecs_task.arn
 
+  lifecycle {
+    precondition {
+      condition     = var.container_image == "" || var.database_secret_arn != ""
+      error_message = "database_secret_arn is required when deploying the application image."
+    }
+  }
+
   container_definitions = jsonencode([{
     name         = "application"
     image        = local.container_image
@@ -293,8 +326,15 @@ resource "aws_ecs_task_definition" "application" {
     environment = [
       { name = "AWS_ENABLED", value = "true" },
       { name = "AWS_REGION", value = var.aws_region },
+      { name = "AWS_METRICS_NAMESPACE", value = local.name },
       { name = "AWS_S3_PRODUCT_BUCKET", value = aws_s3_bucket.product_images.bucket },
       { name = "AWS_SQS_ORDER_QUEUE_URL", value = aws_sqs_queue.order_events.url }
+    ]
+    secrets = var.database_secret_arn == "" ? [] : [
+      { name = "DB_DRIVER", valueFrom = "${var.database_secret_arn}:db_driver::" },
+      { name = "DB_URL", valueFrom = "${var.database_secret_arn}:db_url::" },
+      { name = "DB_USERNAME", valueFrom = "${var.database_secret_arn}:db_username::" },
+      { name = "DB_PASSWORD", valueFrom = "${var.database_secret_arn}:db_password::" }
     ]
     logConfiguration = {
       logDriver = "awslogs"
