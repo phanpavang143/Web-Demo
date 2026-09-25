@@ -36,7 +36,7 @@
 				<ul class="navbar-nav mr-auto"></ul>
 				<ul class="navbar-nav">
 					<li class="nav-item active"><a class="nav-link"
-						href="/dashboard" >Home Page</a></li>
+						href="/admin/Dashboard" >Home Page</a></li>
 					<li class="nav-item active"><a class="nav-link"
 						href="/logout" >Logout</a></li>
 				</ul>
@@ -46,7 +46,7 @@
 	</nav><br>
 	<div class="jumbotron container border border-info">
 		<h3>Update Existing Product</h3>
-		<form action="/admin/products/update/${product.id}" method="post">
+		<form action="/admin/products/update/${product.id}" method="post" enctype="multipart/form-data">
 			<input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/>
 			<div class="row">
 				<div class="col-sm-5">
@@ -96,7 +96,9 @@
 					<p>Product Image</p>
 					<div class="form-group">
 						<label for="productImage">Image Link</label>
-						<input type="text" class="form-control border border-success" id="productImage" name="productImage" value="${product.image}" required>
+						<input type="text" class="form-control border border-success" id="productImage" name="productImage" value="${product.image}" placeholder="Existing or external image URL">
+						<label for="imageFile">Or upload a replacement to AWS S3</label>
+						<input type="file" class="form-control-file" id="imageFile" name="imageFile" accept="image/*">
 					</div>
 					<div class="form-group">
 						<img src="${product.image}" id="imgPreview" height="100px" width="100px"

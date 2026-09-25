@@ -36,6 +36,9 @@ manifest.yml
 out
 overridedb.*
 target
+data/
+.terraform/
+infrastructure/terraform/*.zip
 .flattened-pom.xml
 secrets.yml
 .gradletasknamecache

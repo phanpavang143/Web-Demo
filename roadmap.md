@@ -72,8 +72,8 @@ Goal: Make this a trustworthy, runnable, and maintainable reference project.
 
 ### 1.3 Platform Modernization
 
-- Upgrade to Java 17 and Spring Boot 3.x. [advanced]
-- Migrate javax.* imports to jakarta.* as required. [help wanted]
+- Upgrade to Java 25 and Spring Boot 3.x. [completed]
+- Jakarta namespace migration completed for the Java 25/Spring Boot 3 baseline.
 - Verify Hibernate, security, and plugin compatibility post-migration. [advanced]
 
 ### 1.4 Testing and Quality Gates

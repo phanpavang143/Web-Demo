@@ -31,9 +31,9 @@
 			<div class="collapse navbar-collapse" id="navbarSupportedContent">
 				<ul class="navbar-nav mr-auto"></ul>
 				<ul class="navbar-nav">
-					<li class="nav-item active"><a class="nav-link" href="Dashboard">Home
+					<li class="nav-item active"><a class="nav-link" href="/admin/Dashboard">Home
 							Page</a></li>
-					<li class="nav-item active"><a class="nav-link" href="logout">Logout</a>
+					<li class="nav-item active"><a class="nav-link" href="/admin/logout">Logout</a>
 					</li>
 
 				</ul>
@@ -93,14 +93,14 @@
 					</td>
 
 					<td>
-					<form action="products/delete" method="post">
+					<form action="/admin/products/delete" method="post">
 							<input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/>
 							<input type="hidden" name="id" value="${product.id}">
 							<input type="submit" value="Delete" class="btn btn-danger">
 					</form>
 					</td>
 					<td>
-					<form action="products/update/${product.id}" method="get">
+					<form action="/admin/products/update/${product.id}" method="get">
                         <input type="submit" value="Update" class="btn btn-warning">
                     </form>
 

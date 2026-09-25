@@ -1,5 +1,6 @@
 package com.jtspringproject.JtSpringProject.controller;
 
+import java.io.IOException;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.ModelAndView;
 
 import com.jtspringproject.JtSpringProject.models.Category;
@@ -21,6 +23,7 @@ import com.jtspringproject.JtSpringProject.models.User;
 import com.jtspringproject.JtSpringProject.services.categoryService;
 import com.jtspringproject.JtSpringProject.services.productService;
 import com.jtspringproject.JtSpringProject.services.userService;
+import com.jtspringproject.JtSpringProject.services.ProductImageStorage;
 
 @Controller
 @RequestMapping("/admin")
@@ -29,15 +32,18 @@ public class AdminController {
 	private final userService userService;
 	private final categoryService categoryService;
 	private final productService productService;
+	private final ProductImageStorage productImageStorage;
 	private static final String REDIRECT_ADMIN_PRODUCTS = "redirect:/admin/products";
 	private static final String REDIRECT_ADMIN_CATEGORIES = "redirect:/admin/categories";
 	private static final String VIEW_CATEGORIES = "categories";
 
 	@Autowired
-	public AdminController(userService userService, categoryService categoryService, productService productService) {
+	public AdminController(userService userService, categoryService categoryService, productService productService,
+			ProductImageStorage productImageStorage) {
 		this.userService = userService;
 		this.categoryService = categoryService;
 		this.productService = productService;
+		this.productImageStorage = productImageStorage;
 	}
 
 	@GetMapping("/index")
@@ -117,8 +123,10 @@ public class AdminController {
 	public String addProduct(@RequestParam("name") String name, @RequestParam("categoryid") int categoryId,
 			@RequestParam("price") int price, @RequestParam("weight") int weight,
 			@RequestParam("quantity") int quantity, @RequestParam("description") String description,
-			@RequestParam("productImage") String productImage) {
-		Product product = buildProduct(name, categoryId, price, weight, quantity, description, productImage);
+			@RequestParam(value = "productImage", required = false) String productImage,
+			@RequestParam(value = "imageFile", required = false) MultipartFile imageFile) throws IOException {
+		Product product = buildProduct(name, categoryId, price, weight, quantity, description,
+				resolveImage(imageFile, productImage));
 		this.productService.addProduct(product);
 		return REDIRECT_ADMIN_PRODUCTS;
 	}
@@ -139,8 +147,11 @@ public class AdminController {
 	public String updateProduct(@PathVariable("id") int id, @RequestParam("name") String name,
 			@RequestParam("categoryid") int categoryId, @RequestParam("price") int price,
 			@RequestParam("weight") int weight, @RequestParam("quantity") int quantity,
-			@RequestParam("description") String description, @RequestParam("productImage") String productImage) {
-		Product product = buildProduct(name, categoryId, price, weight, quantity, description, productImage);
+			@RequestParam("description") String description,
+			@RequestParam(value = "productImage", required = false) String productImage,
+			@RequestParam(value = "imageFile", required = false) MultipartFile imageFile) throws IOException {
+		Product product = buildProduct(name, categoryId, price, weight, quantity, description,
+				resolveImage(imageFile, productImage));
 		this.productService.updateProduct(id, product);
 		return REDIRECT_ADMIN_PRODUCTS;
 	}
@@ -213,6 +224,11 @@ public class AdminController {
 		product.setWeight(weight);
 		product.setQuantity(quantity);
 		return product;
+	}
+
+	private String resolveImage(MultipartFile imageFile, String imageLink) throws IOException {
+		String storedImage = productImageStorage.store(imageFile);
+		return storedImage == null || storedImage.isEmpty() ? imageLink : storedImage;
 	}
 
 }

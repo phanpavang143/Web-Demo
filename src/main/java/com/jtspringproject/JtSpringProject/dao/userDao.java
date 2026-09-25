@@ -2,7 +2,7 @@ package com.jtspringproject.JtSpringProject.dao;
 
 import java.util.List;
 
-import javax.persistence.NoResultException;
+import jakarta.persistence.NoResultException;
 
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;

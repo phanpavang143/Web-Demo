@@ -37,7 +37,7 @@
 				<ul class="navbar-nav mr-auto"></ul>
 				<ul class="navbar-nav">
 					<li class="nav-item active"><a class="nav-link"
-						href="/adminhome" >Home Page</a></li>
+						href="/admin/Dashboard" >Home Page</a></li>
 					<li class="nav-item active"><a class="nav-link"
 						href="/logout" >Logout</a></li>
 
@@ -48,7 +48,7 @@
 	</nav><br>
 	<div class="jumbotron container border border-info">
 		<h3>Add a new Product</h3>
-		<form action="/admin/products/add" method="post">
+		<form action="/admin/products/add" method="post" enctype="multipart/form-data">
 			<input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/>
 			<div class="row">
 				<div class="col-sm-5">
@@ -103,7 +103,9 @@
 					<p>Product Image</p>
 					<div class="form-group">
 											<label for="Image">Image Link</label>
-                      						<input type="text" class="form-control border border-warning" required name="productImage" placeholder="Enter Short Image Link">
+                      						<input type="text" class="form-control border border-warning" name="productImage" placeholder="Enter image URL (optional)">
+                      						<label for="imageFile">Or upload to AWS S3</label>
+                      						<input type="file" class="form-control-file" id="imageFile" name="imageFile" accept="image/*">
 
 
 					</div>

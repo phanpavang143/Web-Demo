@@ -1,5 +1,7 @@
 package com.jtspringproject.JtSpringProject.configuration;
 
+import jakarta.servlet.DispatcherType;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -27,9 +29,11 @@ public class SecurityConfiguration {
 
 		@Bean
 		SecurityFilterChain adminFilterChain(HttpSecurity http) throws Exception {
-			http.antMatcher("/admin/**")
+			http.securityMatcher("/admin/**")
 					.authorizeHttpRequests(requests -> requests
 							.requestMatchers(new AntPathRequestMatcher("/admin/login")).permitAll()
+							.requestMatchers(new AntPathRequestMatcher("/resources/**")).permitAll()
+							.requestMatchers(new AntPathRequestMatcher("/403")).permitAll()
 							.requestMatchers(new AntPathRequestMatcher("/admin/**")).hasRole("ADMIN"))
 					.formLogin(login -> login
 							.loginPage("/admin/login")
@@ -39,7 +43,8 @@ public class SecurityConfiguration {
 							})
 							.failureHandler((request, response, exception) -> {
 								response.sendRedirect("/admin/login?error=true");
-							}))
+							})
+							.permitAll())
 
 					// Keep GET logout to remain compatible with existing logout anchor links.
 					.logout(logout -> logout.logoutRequestMatcher(new AntPathRequestMatcher("/admin/logout", "GET"))
@@ -58,8 +63,9 @@ public class SecurityConfiguration {
 		@Bean
 		SecurityFilterChain userFilterChain(HttpSecurity http) throws Exception {
 			http.authorizeHttpRequests(requests -> requests
-					.antMatchers("/login", "/register", "/newuserregister").permitAll()
-					.antMatchers("/**").hasRole("USER"))
+					.dispatcherTypeMatchers(DispatcherType.FORWARD, DispatcherType.ERROR).permitAll()
+					.requestMatchers("/login", "/register", "/newuserregister", "/resources/**", "/403").permitAll()
+					.requestMatchers("/**").hasRole("USER"))
 					.formLogin(login -> login
 							.loginPage("/login")
 							.loginProcessingUrl("/userloginvalidate")
@@ -68,7 +74,8 @@ public class SecurityConfiguration {
 							})
 							.failureHandler((request, response, exception) -> {
 								response.sendRedirect("/login?error=true");
-							}))
+							})
+							.permitAll())
 
 					// Keep GET logout to remain compatible with existing logout anchor links.
 					.logout(logout -> logout.logoutRequestMatcher(new AntPathRequestMatcher("/logout", "GET"))

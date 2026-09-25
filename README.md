@@ -46,16 +46,16 @@ This project follows a layered MVC architecture and supports role-based access f
 ## Tech Stack
 
 <p>
-  <img src="https://img.shields.io/badge/Java-11-ED8B00?style=flat-square&logo=openjdk&logoColor=white&labelColor=1a1a2e" alt="Java 11"/>
-  <img src="https://img.shields.io/badge/Spring%20Boot-2.6.4-6DB33F?style=flat-square&logo=springboot&logoColor=white&labelColor=1a1a2e" alt="Spring Boot"/>
-  <img src="https://img.shields.io/badge/Spring%20Security-5.x-6DB33F?style=flat-square&logo=springsecurity&logoColor=white&labelColor=1a1a2e" alt="Spring Security"/>
+  <img src="https://img.shields.io/badge/Java-25-ED8B00?style=flat-square&logo=openjdk&logoColor=white&labelColor=1a1a2e" alt="Java 25"/>
+  <img src="https://img.shields.io/badge/Spring%20Boot-3.5.6-6DB33F?style=flat-square&logo=springboot&logoColor=white&labelColor=1a1a2e" alt="Spring Boot"/>
+  <img src="https://img.shields.io/badge/Spring%20Security-6.x-6DB33F?style=flat-square&logo=springsecurity&logoColor=white&labelColor=1a1a2e" alt="Spring Security"/>
   <img src="https://img.shields.io/badge/Hibernate-ORM-59666C?style=flat-square&logo=hibernate&logoColor=white&labelColor=1a1a2e" alt="Hibernate"/>
   <img src="https://img.shields.io/badge/MySQL-8.x-4479A1?style=flat-square&logo=mysql&logoColor=white&labelColor=1a1a2e" alt="MySQL"/>
   <img src="https://img.shields.io/badge/Maven-Build-C71A36?style=flat-square&logo=apachemaven&logoColor=white&labelColor=1a1a2e" alt="Maven"/>
 </p>
 
-- Java 11
-- Spring Boot 2.6.4
+- Java 25
+- Spring Boot 3.5.6
 - Spring MVC
 - Spring Security
 - Hibernate ORM (via `LocalSessionFactoryBean`)
@@ -87,8 +87,8 @@ pom.xml
 
 ### Prerequisites
 
-- Java 11+
-- Maven 3.8+
+- Java 25+
+- Maven 3.9+
 - MySQL or MariaDB
 
 ### 1) Clone and move into project
@@ -108,7 +108,7 @@ db.url=jdbc:mysql://localhost:3306/ecommjava?createDatabaseIfNotExist=true
 db.username=your_db_user
 db.password=your_db_password
 
-hibernate.dialect=org.hibernate.dialect.MySQL5Dialect
+hibernate.dialect=org.hibernate.dialect.MySQLDialect
 hibernate.show_sql=true
 hibernate.hbm2ddl.auto=update
 entitymanager.packagesToScan=com

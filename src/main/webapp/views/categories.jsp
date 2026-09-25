@@ -35,9 +35,9 @@
 			<div class="collapse navbar-collapse" id="navbarSupportedContent">
 				<ul class="navbar-nav mr-auto"></ul>
 				<ul class="navbar-nav">
-					<li class="nav-item active"><a class="nav-link" href="Dashboard">Home
+					<li class="nav-item active"><a class="nav-link" href="/admin/Dashboard">Home
 							Page</a></li>
-					<li class="nav-item active"><a class="nav-link" href="logout">Logout</a>
+					<li class="nav-item active"><a class="nav-link" href="/admin/logout">Logout</a>
 					</li>
 
 				</ul>
@@ -60,7 +60,7 @@
 			aria-hidden="true">
 			<div class="modal-dialog modal-dialog-centered" role="document">
 				<div class="modal-content">
-					<form action="categories" method="post">
+					<form action="/admin/categories" method="post">
 						<input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/>
 						<div class="modal-header">
 							<h5 class="modal-title" id="exampleModalLongTitle">Add New
@@ -104,7 +104,7 @@
 					<td>${category.name }</td>
 
 					<td>
-						<form action="categories/delete" method="post">
+						<form action="/admin/categories/delete" method="post">
 							<input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/>
 							<input type="hidden" name="id" value="${category.id}">
 							<input type="submit" value="Delete" class="btn btn-danger">
@@ -112,7 +112,7 @@
 					</td>
 
 					<td>
-						<form action="categories/update" method="post">
+						<form action="/admin/categories/update" method="post">
 							<input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/>
 
 

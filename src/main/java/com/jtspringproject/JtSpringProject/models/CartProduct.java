@@ -1,6 +1,6 @@
 package com.jtspringproject.JtSpringProject.models;
 
-import javax.persistence.*;
+import jakarta.persistence.*;
 
 @Entity
 @Table(name = "CART_PRODUCT")
