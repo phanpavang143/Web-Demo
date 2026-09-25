@@ -1,103 +1,361 @@
-# AWS deployment
+autoscaling, a scheduled Lambda heartbeat, CloudWatch logs/metrics/alarm and
+# Triển khai E-commerce Spring Boot lên AWS
 
-This project uses three AWS services:
+Tài liệu này hướng dẫn triển khai đúng theo Terraform và mã nguồn hiện tại của
+dự án. Các lệnh bên dưới dùng PowerShell trên Windows.
 
-## AWS deployment
+## 1. Kiến trúc AWS của dự án
 
-Terraform provisions this Spring Boot application with the following flow:
+Terraform trong thư mục `infrastructure/terraform` tạo luồng sau:
 
 ```text
-Internet -> public ALB -> private ECS Fargate tasks -> NAT Gateway -> AWS APIs
-							  |
-							  +-> CloudWatch Logs
-EventBridge -> Lambda -> CloudWatch custom metric -> alarm
-AWS API activity -> CloudTrail -> private S3 audit bucket
+Internet
+	 |
+Public Application Load Balancer
+	 |
+Private ECS Fargate tasks (Spring Boot, port 8080)
+	 |                         |
+	 |                         +--> CloudWatch Logs
+	 +--> NAT Gateway --> AWS APIs
+
+S3: ảnh sản phẩm riêng tư
+SQS: sự kiện order
+EventBridge --> Lambda heartbeat --> CloudWatch metric/alarm
+CloudTrail --> S3 bucket audit riêng tư
+ECR: lưu Docker image
 ```
 
-The stack includes a VPC, two public and two private subnets, Internet Gateway,
-NAT Gateway, ECR, ECS Fargate, an Application Load Balancer, ECS CPU
-autoscaling, a scheduled Lambda heartbeat, CloudWatch logs/metrics/alarm and
-multi-region CloudTrail. S3 product images and SQS order events remain private
-and are accessible to the ECS task role.
+Các tài nguyên chính gồm VPC, Internet Gateway, hai public subnet, hai
+private subnet, NAT Gateway, ECR, ECS Fargate, ALB, autoscaling ECS,
+CloudWatch Logs/Metrics/Alarm, Lambda, EventBridge, CloudTrail, S3 và SQS.
 
-## Prerequisites
+Ứng dụng Java sử dụng AWS SDK trong
+`src/main/java/.../configuration/AwsConfiguration.java`. Khi
+`AWS_ENABLED=true`, SDK dùng AWS Default Credentials Provider Chain. Trên ECS,
+quyền được cấp qua IAM task role; không cần lưu access key trong source code.
 
-- AWS credentials configured for Terraform.
-- Terraform 1.5 or newer.
-- JDK 25 and Docker.
+## 2. Điều kiện cần trước khi bắt đầu
 
-## Build and publish the application image
+Cài các công cụ sau:
 
-From the repository root:
+- AWS CLI
+- Terraform từ phiên bản 1.5 trở lên
+- Docker Desktop
+- JDK 25
+- Git
+
+Kiểm tra cài đặt:
 
 ```powershell
+aws --version
+terraform version
+docker --version
+java -version
+```
+
+Bạn cần một AWS account có quyền tạo VPC, IAM, ECS, ECR, ALB, S3, SQS,
+CloudWatch, Lambda, EventBridge và CloudTrail. Những tài nguyên này có thể
+phát sinh chi phí, đặc biệt là NAT Gateway, ALB, ECS và CloudTrail.
+
+## 3. Đăng nhập AWS an toàn
+
+Khuyến nghị dùng IAM Identity Center/SSO thay vì tạo access key lâu dài:
+
+```powershell
+aws configure sso
+```
+
+Khi được hỏi, chọn account, region và profile. Sau đó đăng nhập:
+
+```powershell
+aws sso login --profile my-aws
+$env:AWS_PROFILE = "my-aws"
+aws sts get-caller-identity
+```
+
+Lệnh cuối phải trả về đúng `Account`, `Arn` và `UserId` của tài khoản bạn muốn
+dùng. Nếu dùng access key cho môi trường tạm thời, cấu hình bằng:
+
+```powershell
+aws configure --profile my-aws
+$env:AWS_PROFILE = "my-aws"
+```
+
+Không commit các file chứa access key, secret key, mật khẩu hoặc token vào
+repository.
+
+## 4. Cấu hình Terraform
+
+Đi tới thư mục Terraform:
+
+```powershell
+cd "D:\Web AWS\E-commerce-project-springBoot\infrastructure\terraform"
+```
+
+File mẫu hiện tại là `variables.tfvars.example`:
+
+```hcl
+aws_region      = "ap-southeast-1"
+project_name    = "jt-spring-commerce"
+vpc_cidr        = "10.20.0.0/16"
+container_image = ""
+```
+
+Có thể tạo file riêng để không sửa file mẫu:
+
+```powershell
+Copy-Item variables.tfvars.example variables.tfvars
+```
+
+Sửa `variables.tfvars` nếu cần. `project_name` phải phù hợp với tên tài nguyên
+AWS của account/region. `container_image` để trống ở lần đầu để Terraform dùng
+nginx tạm thời và tạo được ALB/ECS service.
+
+Khởi tạo và kiểm tra cấu hình:
+
+```powershell
+terraform init
+terraform fmt -check
+terraform validate
+terraform plan -var-file=variables.tfvars
+```
+
+Đọc kỹ plan trước khi xác nhận. Không chạy `apply` nếu region, CIDR hoặc tên
+project không đúng mong muốn.
+
+## 5. Kiểm tra database trước khi triển khai ECS
+
+Terraform hiện tại **không tạo MySQL/RDS**. Ứng dụng mặc định trong
+`src/main/resources/application.properties` dùng:
+
+```text
+jdbc:mysql://localhost:3306/ecommjava
+```
+
+ECS không thể kết nối database trên `localhost` của máy phát triển. Trước khi
+đưa Spring Boot lên ECS, cần chọn một trong hai cách:
+
+1. Tạo Amazon RDS for MySQL trong private subnet và cho phép ECS security
+	 group truy cập cổng `3306`.
+2. Dùng MySQL/MariaDB đang chạy ở một hệ thống bên ngoài AWS, có endpoint mà
+	 private ECS task truy cập được.
+
+Database cần có schema/dữ liệu từ `basedata.sql`. Khi chạy production, truyền
+các biến kết nối vào ECS task:
+
+```text
+DB_DRIVER=com.mysql.cj.jdbc.Driver
+DB_URL=jdbc:mysql://<rds-endpoint>:3306/ecommjava
+DB_USERNAME=<database-user>
+DB_PASSWORD=<database-password>
+```
+
+Trong Spring Boot, tên biến môi trường dạng `DB_URL` được ánh xạ thành
+`db.url`. Không ghi mật khẩu database vào `variables.tfvars`; nên dùng AWS
+Secrets Manager hoặc ECS Secrets cho production.
+
+## 6. Cho phép ALB health check
+
+Terraform cấu hình ALB kiểm tra:
+
+```text
+/actuator/health
+```
+
+Route này phải trả HTTP 200 mà không cần đăng nhập. Security configuration hiện
+đang bảo vệ các route còn lại bằng role `USER`, vì vậy cần cho phép health
+endpoint trước khi deploy thật:
+
+```java
+.requestMatchers("/actuator/health").permitAll()
+```
+
+Sau khi sửa, chạy test và build lại image. Nếu endpoint trả 302 về `/login`,
+ALB sẽ đánh dấu ECS task là unhealthy.
+
+## 7. Tạo hạ tầng cơ sở lần đầu
+
+Sau khi AWS credentials, Terraform và database đã sẵn sàng:
+
+```powershell
+terraform apply -var-file=variables.tfvars
+```
+
+Nhập `yes` khi Terraform hiển thị yêu cầu xác nhận. Lần đầu này sử dụng nginx
+tạm thời vì `container_image` đang rỗng.
+
+Kiểm tra các output quan trọng:
+
+```powershell
+terraform output
+terraform output -raw ecr_repository_url
+terraform output -raw product_images_bucket
+terraform output -raw order_events_queue_url
+terraform output -raw load_balancer_url
+```
+
+## 8. Build và push Docker image lên ECR
+
+Từ thư mục gốc project:
+
+```powershell
+cd "D:\Web AWS\E-commerce-project-springBoot"
 docker build -t jt-spring-commerce:latest .
 ```
 
-Create the base infrastructure first. With an empty `container_image`, ECS
-temporarily uses nginx so the load balancer can be created:
+Đăng nhập Docker vào ECR:
 
 ```powershell
-cd infrastructure/terraform
-terraform init
-terraform apply -var-file=variables.tfvars.example
+cd infrastructure\terraform
 $ECR = terraform output -raw ecr_repository_url
-aws ecr get-login-password --region ap-southeast-1 | docker login --username AWS --password-stdin $ECR
+$REGION = "ap-southeast-1"
+
+aws ecr get-login-password --region $REGION |
+	docker login --username AWS --password-stdin $ECR
+```
+
+Gắn tag và push image:
+
+```powershell
 docker tag jt-spring-commerce:latest "$ECR:latest"
 docker push "$ECR:latest"
 ```
 
-Deploy the application image and replace the temporary task:
+## 9. Cập nhật ECS chạy image Spring Boot
+
+Chạy Terraform với image vừa push:
 
 ```powershell
-terraform apply -var-file=variables.tfvars.example -var="container_image=$ECR:latest"
-terraform output load_balancer_url
+terraform apply `
+	-var-file=variables.tfvars `
+	-var="container_image=$ECR:latest"
 ```
 
-The ALB health check uses `/actuator/health`. The application exposes only
-`health` and `info` through Actuator.
+Terraform sẽ tạo task definition mới và ECS service sẽ thay thế task nginx
+bằng image của ứng dụng.
 
-## Application configuration
+Lấy địa chỉ website:
 
-The ECS task receives these values automatically:
+```powershell
+$URL = terraform output -raw load_balancer_url
+$URL
+Invoke-WebRequest "$URL/actuator/health" -UseBasicParsing
+```
+
+Nếu health check trả `200`, mở `$URL` trên trình duyệt. Nếu trả `302`, kiểm tra
+SecurityConfiguration. Nếu task dừng, xem log ECS/CloudWatch để kiểm tra
+database, biến môi trường và quyền IAM.
+
+## 10. Cấu hình AWS mà ứng dụng nhận được
+
+Terraform đã truyền tự động các biến sau vào ECS:
 
 ```text
 AWS_ENABLED=true
 AWS_REGION=ap-southeast-1
-AWS_S3_PRODUCT_BUCKET=<Terraform output>
-AWS_SQS_ORDER_QUEUE_URL=<Terraform output>
+AWS_S3_PRODUCT_BUCKET=<product_images_bucket output>
+AWS_SQS_ORDER_QUEUE_URL=<order_events_queue_url output>
 ```
 
-The task uses its IAM role instead of static AWS keys. The S3 image bucket and
-CloudTrail bucket block public access. The single NAT Gateway keeps the example
-small; production deployments should consider one NAT Gateway per AZ or VPC
-endpoints to reduce failure and data-transfer risk.
+Ý nghĩa:
 
-## Cleanup
+- **S3**: lưu ảnh sản phẩm. Bucket bị khóa public; ứng dụng dùng presigned URL.
+- **SQS**: gửi sự kiện order vào queue riêng tư.
+- **CloudWatch**: lưu log ECS và metric ứng dụng.
+- **ECR**: lưu image Docker.
+- **Lambda/EventBridge**: gửi heartbeat định kỳ.
+- **CloudTrail**: ghi hoạt động AWS vào bucket audit riêng tư.
+
+IAM task role hiện cấp quyền S3 cho object ảnh và quyền gửi/nhận/xóa message
+trên SQS. Không cấp quyền public cho bucket.
+
+## 11. Kiểm tra sau triển khai
+
+Kiểm tra ECS service:
 
 ```powershell
-terraform destroy -var-file=variables.tfvars.example
+aws ecs list-clusters --region ap-southeast-1
+aws ecs list-services `
+	--cluster jt-spring-commerce `
+	--region ap-southeast-1
 ```
 
-Review CloudTrail and S3 retention requirements before destroying a production
-environment.
+Kiểm tra task đang chạy:
 
-## Provision infrastructure
-
-```bash
-cd infrastructure/terraform
-terraform init
-terraform plan -var-file=variables.tfvars.example
-terraform apply -var-file=variables.tfvars.example
+```powershell
+aws ecs list-tasks `
+	--cluster jt-spring-commerce `
+	--service-name jt-spring-commerce `
+	--region ap-southeast-1
 ```
 
-Configure the application with an IAM role or the AWS default credential chain:
+Kiểm tra log bằng AWS Console tại:
 
 ```text
-AWS_ENABLED=true
-AWS_REGION=ap-southeast-1
-AWS_S3_PRODUCT_BUCKET=<terraform product_images_bucket output>
-AWS_SQS_ORDER_QUEUE_URL=<terraform order_events_queue_url output>
+CloudWatch -> Logs -> Log groups -> /aws/jt-spring-commerce/application
 ```
 
-The S3 bucket is private. Use presigned URLs or a CloudFront distribution before exposing images publicly.
+Kiểm tra các trang ứng dụng:
+
+```powershell
+Invoke-WebRequest "$URL/actuator/health" -UseBasicParsing
+Invoke-WebRequest "$URL/login" -UseBasicParsing
+Invoke-WebRequest "$URL/register" -UseBasicParsing
+```
+
+Sau khi đăng nhập, kiểm tra sản phẩm, profile, giỏ hàng và upload ảnh. S3
+bucket là private nên không nên kiểm tra bằng URL object public; hãy dùng URL
+presigned do ứng dụng tạo.
+
+## 12. Cập nhật phiên bản mới
+
+Mỗi lần thay đổi mã nguồn:
+
+```powershell
+cd "D:\Web AWS\E-commerce-project-springBoot"
+docker build -t jt-spring-commerce:latest .
+
+cd infrastructure\terraform
+$ECR = terraform output -raw ecr_repository_url
+docker tag jt-spring-commerce:latest "$ECR:latest"
+docker push "$ECR:latest"
+
+terraform apply `
+	-var-file=variables.tfvars `
+	-var="container_image=$ECR:latest"
+```
+
+Nên dùng tag bất biến như `:2026-09-25-01` thay cho `:latest` trong production
+để rollback dễ dàng.
+
+## 13. Xóa tài nguyên và tránh phát sinh chi phí
+
+Trước khi xóa, kiểm tra dữ liệu trong S3, CloudTrail và database. Sau đó:
+
+```powershell
+terraform destroy -var-file=variables.tfvars
+```
+
+Xác nhận trên AWS Console rằng ECS, ALB, NAT Gateway, ECR, S3, SQS, Lambda,
+CloudTrail và CloudWatch resources đã được xử lý. Các bucket có dữ liệu hoặc
+CloudTrail retention policy có thể cần dọn riêng.
+
+## 14. Lỗi thường gặp
+
+| Triệu chứng | Nguyên nhân và cách xử lý |
+|---|---|
+| `Unable to locate credentials` | Chạy lại `aws sso login`, kiểm tra `$env:AWS_PROFILE` và `aws sts get-caller-identity`. |
+| ECS task dừng ngay sau khi chạy | Kiểm tra CloudWatch Logs; thường do thiếu database hoặc sai biến `DB_URL`. |
+| ALB báo unhealthy | Kiểm tra `/actuator/health` có trả 200 không và security rule có `permitAll()` không. |
+| Upload ảnh lỗi AccessDenied | Kiểm tra ECS task role và tên `AWS_S3_PRODUCT_BUCKET`. |
+| Gửi order lỗi AccessDenied | Kiểm tra `AWS_SQS_ORDER_QUEUE_URL` và quyền `sqs:SendMessage`. |
+| Terraform báo resource đã tồn tại | Đổi `project_name`, kiểm tra state hoặc import resource theo hướng dẫn Terraform. |
+| Không truy cập được database | Kiểm tra route private subnet, NAT/RDS security group và cổng 3306. |
+
+## 15. Tài liệu liên quan
+
+- Cấu hình AWS mẫu: `config/aws.env.example`
+- Biến Terraform mẫu: `infrastructure/terraform/variables.tfvars.example`
+- Docker image: `Dockerfile`
+- Cấu hình local/dev: `src/main/resources/application-dev.properties`
+- Dữ liệu mẫu: `basedata.sql`
