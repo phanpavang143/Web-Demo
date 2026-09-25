@@ -73,6 +73,16 @@
 			<div class="col-sm-3 pt-4">
 				<div class="card" style="background-color: white;">
 					<div class="card-body text-center">
+						<h4 class="card-title">Orders</h4>
+						<p>---------------------------------------------</p>
+						<p class="card-text">Review customer orders and payment status.</p>
+						<a href="/admin/orders" class="card-link btn btn-primary">Manage</a>
+					</div>
+				</div>
+			</div>
+			<div class="col-sm-3 pt-4">
+				<div class="card" style="background-color: white;">
+					<div class="card-body text-center">
 						<h4 class="card-title">Customers</h4>
 						<p>---------------------------------------------</p>
 						<p class="card-text">Manage all the customer here.</p>

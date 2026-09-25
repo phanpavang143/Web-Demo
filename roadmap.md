@@ -100,7 +100,7 @@ Goal: Move from a skeleton to a complete and coherent e-commerce flow.
 ### 2.1 Cart and Checkout
 
 - Complete cart lifecycle (add, update, remove, clear). [help wanted]
-- Implement checkout flow with order placement and confirmation. [advanced]
+- Implement checkout flow with order placement and confirmation. [completed]
 - Introduce order states (created, paid, failed, shipped, delivered, canceled). [help wanted]
 
 ### 2.2 Architecture Improvements

@@ -39,7 +39,7 @@ public class UserController {
 
 	@GetMapping("/buy")
 	public String buy() {
-		return "buy";
+		return "redirect:/checkout";
 	}
 
 	@GetMapping("/login")

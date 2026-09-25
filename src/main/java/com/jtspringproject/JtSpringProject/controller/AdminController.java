@@ -18,12 +18,14 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.ModelAndView;
 
 import com.jtspringproject.JtSpringProject.models.Category;
+import com.jtspringproject.JtSpringProject.models.Order;
 import com.jtspringproject.JtSpringProject.models.Product;
 import com.jtspringproject.JtSpringProject.models.User;
 import com.jtspringproject.JtSpringProject.services.categoryService;
 import com.jtspringproject.JtSpringProject.services.productService;
 import com.jtspringproject.JtSpringProject.services.userService;
 import com.jtspringproject.JtSpringProject.services.ProductImageStorage;
+import com.jtspringproject.JtSpringProject.services.orderService;
 
 @Controller
 @RequestMapping("/admin")
@@ -32,6 +34,7 @@ public class AdminController {
 	private final userService userService;
 	private final categoryService categoryService;
 	private final productService productService;
+	private final orderService orderService;
 	private final ProductImageStorage productImageStorage;
 	private static final String REDIRECT_ADMIN_PRODUCTS = "redirect:/admin/products";
 	private static final String REDIRECT_ADMIN_CATEGORIES = "redirect:/admin/categories";
@@ -39,10 +42,11 @@ public class AdminController {
 
 	@Autowired
 	public AdminController(userService userService, categoryService categoryService, productService productService,
-			ProductImageStorage productImageStorage) {
+			ProductImageStorage productImageStorage, orderService orderService) {
 		this.userService = userService;
 		this.categoryService = categoryService;
 		this.productService = productService;
+		this.orderService = orderService;
 		this.productImageStorage = productImageStorage;
 	}
 
@@ -172,6 +176,14 @@ public class AdminController {
 		ModelAndView mView = new ModelAndView("displayCustomers");
 		List<User> users = this.userService.getUsers();
 		mView.addObject("customers", users);
+		return mView;
+	}
+
+	@GetMapping("orders")
+	public ModelAndView getOrders() {
+		ModelAndView mView = new ModelAndView("adminOrders");
+		List<Order> orders = this.orderService.getOrders();
+		mView.addObject("orders", orders);
 		return mView;
 	}
 

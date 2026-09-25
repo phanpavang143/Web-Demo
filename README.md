@@ -40,6 +40,8 @@ This project follows a layered MVC architecture and supports role-based access f
 - Custom Hibernate SessionFactory configuration (non-Spring-Data JPA runtime)
 - MySQL-backed persistence with DAO and service layers
 - Admin modules for products, categories, and customer listing
+- Persistent checkout with order confirmation and cash-on-delivery payments
+- Admin order listing and SQS order-created events when AWS is enabled
 - User modules for registration, login, profile management, and product browsing
 - Jenkins pipeline file included for CI/CD bootstrap
 
@@ -142,6 +144,8 @@ If JSP views are not resolved, set the run configuration working directory to `$
 - `/register`
 - `/newuserregister`
 - `/user/products`
+- `/cart`
+- `/checkout`
 - `/profileDisplay`
 
 ### Admin
@@ -151,6 +155,7 @@ If JSP views are not resolved, set the run configuration working directory to `$
 - `/admin/products`
 - `/admin/categories`
 - `/admin/customers`
+- `/admin/orders`
 
 ## Security Model
 
@@ -160,6 +165,8 @@ If JSP views are not resolved, set the run configuration working directory to `$
   - Admin: `/admin/login`
   - User: `/login`
 - CSRF protection is enabled for form submissions
+- Checkout currently supports cash on delivery; online card payments require a
+  payment-provider adapter and secret configuration.
 
 ## Build and Test
 

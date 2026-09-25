@@ -28,6 +28,12 @@ Các tài nguyên chính gồm VPC, Internet Gateway, hai public subnet, hai
 private subnet, NAT Gateway, ECR, ECS Fargate, ALB, autoscaling ECS,
 CloudWatch Logs/Metrics/Alarm, Lambda, EventBridge, CloudTrail, S3 và SQS.
 
+Ứng dụng hiện hỗ trợ giỏ hàng theo session, checkout lưu đơn hàng vào database,
+thanh toán tiền mặt khi nhận hàng (COD), trang xác nhận và màn hình admin xem
+đơn hàng. Khi bật AWS, sự kiện `ORDER_CREATED` được gửi lên SQS và metric được
+đẩy lên CloudWatch. Thanh toán thẻ/online chưa được giả lập; muốn dùng cần
+thêm adapter cho nhà cung cấp thanh toán và lưu secret tương ứng.
+
 Ứng dụng Java sử dụng AWS SDK trong
 `src/main/java/.../configuration/AwsConfiguration.java`. Khi
 `AWS_ENABLED=true`, SDK dùng AWS Default Credentials Provider Chain. Trên ECS,
